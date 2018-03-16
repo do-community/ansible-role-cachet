@@ -1,0 +1,12 @@
+- name: reload nginx
+  service:
+    name: nginx
+    state: reloaded
+
+- name: reload php-fpm
+  service:
+    name: php7.0-fpm
+    state: reloaded
+
+- name: reload config cache
+  command: chdir=/var/www/cachet php artisan config:cache
