@@ -1,4 +1,12 @@
 ---
+
+# fixes composer IPv6 issues
+- name: Set IPv4 outbound connectivity precedence
+  lineinfile:
+    path: /etc/gai.conf
+    insertafter: '^#precedence ::ffff:0:0/96  100'
+    line: 'precedence ::ffff:0:0/96  100'
+
 - name: Install Certbot repository
   apt_repository:
     repo: "ppa:certbot/certbot"
@@ -42,12 +50,17 @@
     creates: /usr/local/bin/composer
   register: composer
 
+- name: Check for Prestissimo install
+  stat:
+    path: /root/.config/composer/vendor/hirak/prestissimo/
+  register: prestissimo
+
 - name: Install Prestissimo Composer plugin
   composer:
     command: require
     arguments: hirak/prestissimo:^0.3
     global_command: true
-  when: composer.changed
+  when: prestissimo.stat.exists == false
 
 - name: Create Cachet directory
   file:
@@ -96,6 +109,7 @@
 - name: Reload Nginx before Let's Encrypt challenge
   meta: flush_handlers
 
+# Let's Encrypt TOS: https://letsencrypt.org/documents/2017.11.15-LE-SA-v1.2.pdf
 - name: Get Let's Encrypt certificate
   command: certbot certonly --nginx -d {{ cachet_hostname }} -n -m {{ cachet_letsencrypt_email }} --agree-tos
   args:
@@ -108,26 +122,36 @@
   notify:
     - reload nginx
 
+- name: Check for previous Cachet dependencies install
+  stat:
+    path: /var/www/cachet/vendor/
+  register: vendor
+
 - name: Install Cachet dependencies with Composer
   composer:
     command: install
     working_dir: /var/www/cachet
     no_dev: true
     no_scripts: true
-  when: cachet.changed
+  when: vendor.stat.exists == false
   notify:
-    - reload config cache
+    - update app
 
-- name: Install laravel-backup and flysystem-s3
+- name: Check for previous additional packages install
+  stat:
+    path: /var/www/cachet/vendor/spatie/laravel-backup
+  register: additional
+
+- name: Install additional packages with Composer
   composer:
     command: require
     arguments: spatie/laravel-backup:^3.0.0 league/flysystem-aws-s3-v3:^1.0
     working_dir: /var/www/cachet
     no_dev: true
     no_scripts: true
-  when: cachet.changed
+  when: additional.stat.exists == false
   notify:
-    - reload config cache
+    - update app
 
 - name: Create Cachet .env file from template
   template:
@@ -135,7 +159,7 @@
     dest: /var/www/cachet/.env
     owner: www-data
   notify:
-    - reload config cache
+    - update app
 
 - name: Add backup service provider to config/app.php
   lineinfile:
@@ -143,7 +167,7 @@
     insertafter: 'TwigBridge\\ServiceProvider'
     line: '        ''Spatie\Backup\BackupServiceProvider'','
   notify:
-    - reload config cache
+    - update app
 
 - name: Copy updated app/Console/Kernel.php with backup tasks scheduled
   copy:
@@ -151,7 +175,7 @@
     dest: /var/www/cachet/app/Console/Kernel.php
     owner: www-data
   notify:
-    - reload config cache
+    - update app
 
 - name: Create config/laravel-backup.php from template
   template:
@@ -159,7 +183,7 @@
     dest: /var/www/cachet/config/laravel-backup.php
     owner: www-data
   notify:
-    - reload config cache
+    - update app
 
 - name: Create config/filesystems.php from template
   template:
@@ -167,13 +191,9 @@
     dest: /var/www/cachet/config/filesystems.php
     owner: www-data
   notify:
-    - reload config cache
-
-- name: Install Cachet app
-  command: chdir=/var/www/cachet php artisan app:update
-  when: cachet.changed
+    - update app
 
 - name: Install Laravel scheduler cron job
   cron:
-    name: "laravel schedule runner"
+    name: "laravel scheduler runner"
     job: "/usr/bin/php /var/www/cachet/artisan schedule:run >> /dev/null 2>&1"
