@@ -26,12 +26,12 @@ cachet_letsencrypt_email: sammy@example.com
 
 # Type: string
 # Default: (none)
-# Description: The email that will send backup service errors.
+# Description: The email that will send backup service errors messages.
 cachet_backup_emails_from: sammy@example.com
 
 # Type: string
 # Default: (none)
-# Description: The email to receive backup service errors.
+# Description: The email to receive backup service error messages.
 cachet_backup_emails_to: sammy@example.com
 
 # Type: string
