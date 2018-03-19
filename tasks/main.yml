@@ -158,6 +158,7 @@
     src: cachet-env.j2
     dest: /var/www/cachet/.env
     owner: www-data
+    mode: 0600
   notify:
     - update app
 
