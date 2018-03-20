@@ -198,3 +198,4 @@
   cron:
     name: "laravel scheduler runner"
     job: "/usr/bin/php /var/www/cachet/artisan schedule:run >> /dev/null 2>&1"
+    user: www-data

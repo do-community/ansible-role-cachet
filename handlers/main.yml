@@ -10,3 +10,5 @@
 
 - name: update app
   command: chdir=/var/www/cachet php artisan app:update
+  become: true
+  become_user: www-data
